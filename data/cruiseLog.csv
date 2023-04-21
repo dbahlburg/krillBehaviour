@@ -1,0 +1,24 @@
+date;gap;action;from;to
+04.12.20 00:00;large;remain;South Orkneys;South Orkneys
+28.12.20 12:00;large;move;South Orkneys;Bransfield Strait
+01.01.21 12:00;small;remain;Bransfield Strait;Bransfield Strait
+11.01.21 04:00;small;move;Bransfield Strait;South Orkneys
+28.01.21 12:00;large;remain;South Orkneys;South Orkneys
+08.02.21 15:00;small;remain;South Orkneys;South Orkneys
+17.02.21 00:00;large;move;South Orkneys;inshore (SO)
+05.03.21 00:00;large;remain;South Orkneys;South Orkneys
+11.03.21 00:00;small;remain;South Orkneys;South Orkneys
+20.03.21 12:00;large;move;South Orkneys;Bransfield Strait
+28.03.21 20:00;large;move;Bransfield Strait;Tower Island
+08.04.21 12:00;large;remain;Tower Island (but go gradually South);Tower Island
+05.05.21 23:00;small;move;Gerlache Strait;Bransfield Strait
+11.05.21 11:00;small;move;Bransfield Strait;Antarctic Sound Canyon
+25.05.21 11:00;large;remain;Antarctic Sound Canyon;Antarctic Sound Canyon
+01.06.21 11:00;large;remain;Antarctic Sound Canyon;Antarctic Sound Canyon
+05.06.21 11:00;large;move;Bransfield Strait;South Orkneys
+09.06.21 11:00;large;remain;South Orkneys;South Orkneys
+21.06.21 11:00;large;move;South Orkneys;South Georgia and back
+14.07.21 14:00;large;remain;South Orkneys;South Orkneys
+17.07.21 20:00;large;remain;South Orkneys;South Orkneys
+22.07.21 11:00;large;remain;South Orkneys;South Orkneys
+27.07.21 20:00;large;remain;South Orkneys;South Orkneys
