@@ -26,14 +26,6 @@ krillBehaviour <- read.csv('~/github/krillBehaviour/data/qualitativeBehaviourCon
   dplyr::select(date, behavior, behavBlock) %>% 
   mutate(behavior = ifelse(date == as.Date('2021-02-08'), 'shallowDVM', behavior))
 
-COMData <- read.csv('~/github/krillBehaviour/data/behaviourData.csv') %>% 
-  mutate(localTime = as.POSIXct(localTime, format = "%Y-%m-%d %H:%M:%S"),
-         localTime = force_tz(localTime, "Etc/GMT+3"),
-         date = as.Date(as.POSIXct(localTime), tz = 'Etc/GMT+3'),
-         sunrise = force_tz(as.POSIXct(sunrise), "Etc/GMT+3"),
-         sunset = force_tz(as.POSIXct(sunset), "Etc/GMT+3")) %>% 
-  filter(qualityGood == T)
-
 # Visualize different behavioural classes:
 krillBehaviourSelected <- krillBehaviour %>% 
   distinct(behavior) %>% 
