@@ -31,7 +31,7 @@ krillBehaviour <- read.csv('data/qualitativeBehaviourConsensus.csv', sep = ';') 
 # helper tibble for nicer behaviour labels
 behaviourTitles <- tibble(behavior = c('constantSurface','shallowDVM','reverseDVM','DVM','DVM12h',
                                        'diffuseDVM','deepDVM','NA'),
-                          title = c('constant surface', 'DVM-100m', 'reverse DVM', 'DVM-150m', 'DVM 12h', 
+                          title = c('diffuse surface', 'DVM-100m', 'small scale\n reverse DVM', 'DVM-150m', 'DVM 12h', 
                                     'diffuse DVM', 'deep DVM', 'no data')) 
 # add labels to behaviour data
 krillBehaviour <- krillBehaviour %>% 
@@ -57,14 +57,44 @@ southOrkneys <- crop(coastline, ext(-47.5, -43, -60.75, -59))
 # https://doi.pangaea.de/10.1594/PANGAEA.937574?format=html#download
 bathy <- rast('~/github/SOdata/IBCSO_v2_ice-surface_WGS84.nc')
 wholeAreaBathy <- crop(bathy, ext(-62, -43,-65, -59))
-wholeAreaBathy <- as.data.frame(wholeAreaBathy, xy=T) %>% 
-  mutate(elevation = ifelse(x>0,0,z))
-SOBathy <- crop(bathy, ext(-47.1, -43.3, -60.75, -59.1))
-SOBathy <- as.data.frame(SOBathy,xy=T)%>% 
-  mutate(elevation = ifelse(z>0,0,z))
-SOPeninsula <- crop(bathy, ext(-62, -55.9, -64.4, -62.4))
-SOPeninsula <- as.data.frame(SOPeninsula,xy=T)%>% 
-  mutate(elevation = ifelse(z>0,0,z))
+wholeAreaBathy[wholeAreaBathy>0] <- 0
+# ------------------------------------------------------------------------------------------------------------------ #
+# estimate the slope
+sl <- terrain(wholeAreaBathy, "slope", unit = "radians")
+# estimate the aspect or orientation
+asp <- terrain(wholeAreaBathy, "aspect", unit = "radians")
+# calculate the hillshade effect with 45º of elevation
+hillMulti <- purrr::map(c(270, 15, 60, 140, 330), function(dir){
+  shade(sl, asp,
+        angle = 45,
+        direction = dir,
+        normalize= TRUE)}
+)
+# create a multidimensional raster and reduce it by summing up
+hillMulti <- rast(hillMulti) %>% sum()
+#hillMultiAdj <- exp(0.5 * hillMulti/100)
+# ------------------------------------------------------------------------------------------------------------------ #
+# create prettier colours
+nx <- minmax(hillMulti)
+hillMultiScaled <- (hillMulti - nx[1,]) / (nx[2,] - nx[1,])
+hillMultiScaled <- resample(hillMultiScaled, wholeAreaBathy, method = 'bilinear')
+
+nx <- minmax(sl)
+slScaled <- abs((sl - nx[1,]) / (nx[2,] - nx[1,]) - 1)
+slScaled <- resample(slScaled, wholeAreaBathy, method = 'bilinear')
+
+prettyMap <- wholeAreaBathy * slScaled^(1/2) * hillMultiScaled^3
+nx <- minmax(prettyMap)
+prettyMapScaled <- (prettyMap - nx[1,]) / (nx[2,] - nx[1,])
+# ------------------------------------------------------------------------------------------------------------------ #
+# wholeAreaBathy <- as.data.frame(wholeAreaBathy, xy=T) %>% 
+#   mutate(elevation = ifelse(x>0,0,z))
+SOBathy <- crop(prettyMapScaled, ext(-47.1, -43.3, -60.75, -59.1))
+# SOBathy <- as.data.frame(SOBathy,xy=T)%>% 
+#   mutate(elevation = ifelse(z>0,0,z))
+SOPeninsula <- crop(prettyMapScaled, ext(-62, -55.9, -64.4, -62.4))
+# SOPeninsula <- as.data.frame(SOPeninsula,xy=T)%>% 
+#   mutate(elevation = ifelse(z>0,0,z))
 
 # pre-define theme settings for plots to save space
 lightMode <- theme(panel.background = element_rect(fill = '#ffffff', colour = '#212121'),
@@ -84,26 +114,33 @@ monthLabel <- tibble(month = 0:7,
                      monthLabel = factor(c('Dec','Jan','Feb','Mar','Apr','May','Jun','Jul'),
                                          levels = c('Dec','Jan','Feb','Mar','Apr','May','Jun','Jul')))
 
+colourPalette <- colorRampPalette(colors = c("#f55142", "#dbad40","#6dc7b2","#4071db", "#9040db"))
 cruiseTrackPlot <- cruiseData %>% 
   arrange(localTime) %>% 
   mutate(month = month(localTime),
          month = ifelse(month == 12, 0, month)) %>% 
   left_join(., monthLabel) %>% 
   ggplot(.) +
-  geom_raster(data = wholeAreaBathy, aes(x = x, y = y, fill = elevation)) +
+  geom_spatraster(data = wholeAreaBathy,
+                  maxcell = 1.5e+06) +
   scale_fill_steps(low = '#616161', high = '#fafafa',
                    limits = c(-6000, 0),
-                   breaks = seq(-6000, 0, by = 500),
-                   guide = 'none') +
+                   breaks = seq(-6000, 0, by = 500)) +
+  new_scale_fill() +
+  # geom_spatraster(data = prettyMapScaled,
+  #                 maxcell = 1.5e+06) +
+  # scale_fill_gradient(low = '#616161', high = '#fafafa',
+  #                  limits = c(0,1),
+  #                  guide = 'none') +
   geom_spatvector(data = wholeArea, linewidth = 0.1, 
                   colour = NA, fill = '#6e6e6e') +
   geom_path(aes(x = long, y = lat, colour = monthLabel, group = behavBlock),
-            linewidth = 1.5, lineend = 'round')  +
-  scale_colour_manual(values = scico(n = 9, palette = 'batlow')) +
+            linewidth = 2.5, lineend = 'round')  +
+  # scale_colour_manual(values = scico(n = 9, palette = 'batlow')) +
+  scale_colour_manual(values = colourPalette(n = 9)) +
   labs(x = '', y = '') +
   lightMode +
   theme(legend.position = 'bottom')
-
 # subset areas
 cruiseTrackPeninsula <- cruiseTrackPlot +
   scale_x_continuous(limits = c(-62, -55.9), breaks = seq(-62,-56,by = 2)) +
@@ -114,8 +151,9 @@ cruiseTrackSouthOrkneys <- cruiseTrackPlot +
   scale_y_continuous(limits = c(-60.75, -59.1))
 
 # save plots
-ggsave('plots/cruiseTrackPeninsula.pdf', plot = cruiseTrackPeninsula, width = 14, height = 9)
-ggsave('plots/cruiseTrackSouthOrkneys.pdf', plot = cruiseTrackSouthOrkneys, width = 14, height = 9)
+ggsave('plots/cruiseTrackPeninsula.png', plot = cruiseTrackPeninsula + theme(legend.position = 'none'), width = 14, height = 9)
+ggsave('plots/cruiseTrackSouthOrkneys.png', plot = cruiseTrackSouthOrkneys + theme(legend.position = 'none'), width = 14, height = 9)
+ggsave('plots/Figure1legends.pdf', plot = cruiseTrackSouthOrkneys, width = 14, height = 9)
 # ------------------------------------------------------------------------------------------------------------------------------ #
 # Figure 3 behaviour maps and timelines
 # Similar to Figure 1, the final arrangement of the subplots was done in Affinity Design and the following code returns the 
@@ -129,7 +167,7 @@ peninsulaBehavPlot <- cruiseData %>%
   arrange(localTime) %>% 
   filter(lat < -62) %>% 
   mutate(title = factor(title,
-                        levels = c('constant surface', 'reverse DVM', 'DVM-100m', 'DVM-150m', 'DVM 12h', 
+                        levels = c('diffuse surface', 'small scale\n reverse DVM', 'DVM-100m', 'DVM-150m', 'DVM 12h', 
                                    'diffuse DVM', 'deep DVM', 'no data'))) %>% 
   ggplot(.) +
   geom_raster(data = SOPeninsula, aes(x = x, y = y, fill = elevation)) +
@@ -155,7 +193,7 @@ SObehavPlot <- cruiseData %>%
   filter(lat > -62) %>% 
   arrange(localTime) %>% 
   mutate(title = factor(title,
-                        levels = c('constant surface', 'reverse DVM', 'DVM-100m', 'DVM-150m', 'DVM 12h', 
+                        levels = c('diffuse surface', 'small scale\n reverse DVM', 'DVM-100m', 'DVM-150m', 'DVM 12h', 
                                    'diffuse DVM', 'deep DVM', 'no data'))) %>% 
   ggplot(.) +
   geom_raster(data = SOBathy, aes(x = x, y = y, fill = elevation)) +
@@ -205,9 +243,9 @@ labelTib <- cruiseLog %>%
 # tibble for correct behaviour labels
 behavLabel <- tibble(behavior = c('constantSurface', 'reverseDVM','shallowDVM', 'DVM12h','DVM',
                                   'diffuseDVM','deepDVM','noData'),
-                     label = factor(c('constant surface', 'reverse DVM', 'DVM-100m', 'DVM 12h', 'DVM-150m', 
+                     label = factor(c('diffuse surface', 'small scale\n reverse DVM', 'DVM-100m', 'DVM 12h', 'DVM-150m', 
                                       'diffuse DVM', 'deep DVM', 'no data'),
-                                    levels = c('constant surface', 'reverse DVM', 'DVM-100m', 'DVM-150m', 'DVM 12h',  
+                                    levels = c('diffuse surface', 'small scale\n reverse DVM', 'DVM-100m', 'DVM-150m', 'DVM 12h',  
                                                'diffuse DVM', 'deep DVM', 'no data')))
 
 # tibble that contains start and end days of behaviours
@@ -395,7 +433,7 @@ for (i in 1:length(seasonsVec)){
 
 # arrange plots in panel and save
 timePlot <- plot_grid(plotlist=timePlotList, nrow = 1)
-ggsave('plots/Figure4.pdf', plot = timePlot, width = 22, height = 6)
+ggsave('plots/Figure3.pdf', plot = timePlot, width = 22, height = 6)
 # ------------------------------------------------------------------------------------------------------------------------------ #
 # Figure 5 - environmental properties for behaviour classes
 # calculate daily means of environmental variables to match temporal resolution of behavioural classes
@@ -414,7 +452,7 @@ environmentBehaviour <- behaviourData %>%
 # plot the data
 environmentBehaviourPlot <- environmentBehaviour %>% 
   mutate(title = factor(title, 
-                        levels = c('constant surface', 'reverse DVM', 'DVM-100m', 'DVM-150m', 'DVM 12h', 
+                        levels = c('diffuse surface', 'small scale\n reverse DVM', 'DVM-100m', 'DVM-150m', 'DVM 12h', 
                                    'diffuse DVM', 'deep DVM', 'no data'))) %>% 
   ggplot(.,aes(x = title, y = value, fill = title)) +
   geom_boxplot() +
@@ -424,13 +462,13 @@ environmentBehaviourPlot <- environmentBehaviour %>%
   theme(panel.background = element_rect(fill = NA, colour = '#3d3d3d'),
         strip.background = element_rect(fill = NA),
         strip.text = element_text(size = 19),
-        axis.text.x = element_text(size = 16,angle = 90, hjust = 1),
+        axis.text.x = element_text(size = 16,angle = 90, hjust = 1, vjust = 0.5),
         axis.text.y = element_text(size = 16),
         plot.title = element_text(size = 16, hjust = 0.5),
         axis.title = element_text(size = 16),
         plot.margin = margin(75, 25, 5, 10),
         legend.position = 'none')
-ggsave('plots/Figure5.pdf', width = 14, height = 9)
+ggsave('plots/Figure4.pdf', width = 14, height = 9)
 
 
 

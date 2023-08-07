@@ -26,7 +26,7 @@ krillBehaviour <- read.csv('~/github/krillBehaviour/data/qualitativeBehaviourCon
   dplyr::select(date, behavior, behavBlock) %>% 
   mutate(behavior = ifelse(date == as.Date('2021-02-08'), 'shallowDVM', behavior))
 
-COMData <- read.csv('data/behaviourData.csv') %>% 
+COMData <- read.csv('~/github/krillBehaviour/data/behaviourData.csv') %>% 
   mutate(localTime = as.POSIXct(localTime, format = "%Y-%m-%d %H:%M:%S"),
          localTime = force_tz(localTime, "Etc/GMT+3"),
          date = as.Date(as.POSIXct(localTime), tz = 'Etc/GMT+3'),
@@ -42,9 +42,9 @@ krillBehaviourSelected <- krillBehaviour %>%
                                         '2021-01-16','2021-04-13', '2021-05-15',
                                         '2021-07-11'), '00:00:01', sep = ' '), tz = 'Etc/GMT+3'),
          endDate = startDate + days(2) - seconds(2),
-         behaviourTitle = c('DVM-100m (06-07.02.2021)', 'constant surface (29-30.04.2021)',
+         behaviourTitle = c('DVM-100m (06-07.02.2021)', 'diffuse surface (29-30.04.2021)',
                             'DVM-150m (22-23.02.2021)','DVM 12h (16-17.01.2021)',
-                            'reverse DVM (13-14.04.2021)','diffuse DVM (15-16.05.2021)','deep DVM (11-12.07.2021)')) %>% 
+                            'small scale reverse DVM (13-14.04.2021)','diffuse DVM (15-16.05.2021)','deep DVM (11-12.07.2021)')) %>% 
   gather(dateType, dateTime, -behavior, -behaviourTitle) %>% 
   mutate(date = as.Date(dateTime, tz = 'Etc/GMT+3'))
 
@@ -119,14 +119,20 @@ comData <- allAcoustics %>%
   left_join(., behaviours) %>% 
   mutate(behavior = behaviourTitle,
          behavior = factor(behavior, 
-                            levels = c('constant surface (29-30.04.2021)', 'reverse DVM (13-14.04.2021)',
+                            levels = c('diffuse surface (29-30.04.2021)', 'small scale reverse DVM (13-14.04.2021)',
                                        'DVM-100m (06-07.02.2021)', 'DVM-150m (22-23.02.2021)',
                                        'DVM 12h (16-17.01.2021)','diffuse DVM (15-16.05.2021)','deep DVM (11-12.07.2021)'))) 
 
 # create plot for behavioural examples
+sunriseSunset <- comData %>% 
+  mutate(day = day(fakeDate)) %>% 
+  group_by(behavior, behaviourTitle, day) %>% 
+  summarize(sunrise = mean(sunrise),
+            sunset = mean(sunset))
+  
 behavPlot <- allAcoustics %>% 
   mutate(behavior = factor(behavior, 
-                           levels = c('constant surface (29-30.04.2021)', 'reverse DVM (13-14.04.2021)',
+                           levels = c('diffuse surface (29-30.04.2021)', 'small scale reverse DVM (13-14.04.2021)',
                                       'DVM-100m (06-07.02.2021)', 'DVM-150m (22-23.02.2021)',
                                       'DVM 12h (16-17.01.2021)','diffuse DVM (15-16.05.2021)','deep DVM (11-12.07.2021)'))) %>% 
   ggplot(.) +
@@ -152,11 +158,21 @@ behavPlot <- allAcoustics %>%
                    limits = c(as.POSIXct('2020-01-01 00:00:00'),
                               as.POSIXct('2020-01-03 00:00:01'))) +
   scale_y_continuous(limits = c(-250,0), expand = c(0.025,0.025)) +
-  facet_wrap(~behavior, ncol = 2) +
-  geom_vline(xintercept = as.POSIXct(c('2020-01-01 12:00:00','2020-01-02 12:00:00')),
+  geom_vline(data = sunriseSunset,
+             aes(xintercept = sunrise),
              colour = '#616161',
              size = 1.2,
              linetype = '22') +
+  geom_vline(data = sunriseSunset,
+             aes(xintercept = sunset),
+             colour = '#6dc7b2',
+             size = 1.2,
+             linetype = '22') +
+  facet_wrap(~behavior, ncol = 2) +
+  # geom_vline(xintercept = as.POSIXct(c('2020-01-01 12:00:00','2020-01-02 12:00:00')),
+  #            colour = '#616161',
+  #            size = 1.2,
+  #            linetype = '22') +
   theme_bw() +
   theme(axis.title = element_text(size = 28),
         axis.text = element_text(size = 28),
@@ -202,7 +218,6 @@ for(i in 1:nrow(fileIndexes)){
   
   print(i)
 }
-
 
 # create plots
 multipleAscents <- allAcoustics %>% 
@@ -305,23 +320,28 @@ winterWhalesPlot <- winterWhales %>%
         axis.title = element_text(size = 24, colour = '#454545'))
 ggsave('plots/winterWhales.png', plot = winterWhalesPlot, width = 17, height = 7)
 # ----------------------------------------------------------------------------------------------------- #
-# Appendix Figure 5-13
+# Appendix Figure 5-13, month by month
 acousticBlocks <- fileDateInfos %>% 
+  right_join(., tibble(date = seq(as.Date('2020-12-01'), as.Date('2021-07-31'), by = '1 day'))) %>% 
   arrange(date) %>% 
-  mutate(chunkBlock = cut(date, '25 days'),
-         dateBlock = cut(date, '5 days'))
+  mutate(chunkBlock = month(date)) %>% 
+  group_by(chunkBlock) %>% 
+  mutate(dateBlock = cut(date, '6 days')) %>% 
+  ungroup() 
+
 
 dateBlocks <- acousticBlocks %>% 
   distinct(chunkBlock)
 
+allComData <- NULL
 for(i in 1:nrow(dateBlocks)){
   
   # determine current dateBlock
   currentBlock <- as.character(dateBlocks$chunkBlock[i])
- 
+  
   # subset index data to determine datasets that need to be imported
   chunkIndexes <- acousticBlocks %>% 
-    filter(chunkBlock == currentBlock) %>% 
+    filter(chunkBlock == currentBlock) %>%
     distinct(dateBlock)
   
   plotlist <- NULL
@@ -333,52 +353,173 @@ for(i in 1:nrow(dateBlocks)){
     
     fileIndexes <- acousticBlocks %>% 
       filter(dateBlock == chunkIndexes$dateBlock[k]) %>% 
-      distinct(fileIndex)
+      distinct(dateBlock, fileIndex) %>% 
+      filter(!is.na(fileIndex))
     
+    if(nrow(fileIndexes) > 0){
       for(j in 1:nrow(fileIndexes)){
-      
+        
         acousticFile <- readRDS(acousticsPaths[fileIndexes$fileIndex[j]]) 
-      
+        
         acousticContainer <- acousticContainer %>% 
-        bind_rows(., acousticFile)
-      
+          bind_rows(., acousticFile)
+        
       }
+    }
     
-    minDate <- as.POSIXct(paste(chunkIndexes$dateBlock[k], '00:00:00'), 
-                          tz = 'Etc/GMT+3', 
+    minDate <- as.POSIXct(paste(min(filter(acousticBlocks, dateBlock == chunkIndexes$dateBlock[k])$date), '00:00:01'), 
+                          tz = tz(acousticContainer$localTime),
                           format = '%Y-%m-%d %H:%M:%S')
+    maxDate <- as.POSIXct(paste(max(filter(acousticBlocks, dateBlock == chunkIndexes$dateBlock[k])$date), '23:59:59'), 
+                          tz = tz(acousticContainer$localTime), 
+                          format = '%Y-%m-%d %H:%M:%S')
+    
     dateBreaks <- seq(minDate, minDate + days(6), by = '12 hours')
     
-    acousticsPlot <- acousticContainer %>% 
-      ggplot(.,aes(x = localTime, y = depth, fill = biomassScore)) +
-      geom_raster() +
-      scale_fill_scico(palette = 'bilbao', limits = c(0,1)) +
-      scale_x_datetime(limits = c(minDate, minDate + days(6)),
-                       breaks = dateBreaks, 
-                       date_labels = '%H:%M') +
-      labs(x = 'time', y = 'depth in m', fill = 'biomassScore',
-           title = paste('acoustics from', as.Date(minDate), 'to', as.Date(minDate + days(5)))) +
-      geom_vline(xintercept = seq(minDate + hours(12), minDate + days(6) - hours(12), by = '24 hours')) +
-      theme(panel.background = element_rect(fill = NA, colour = '#292929'),
-            legend.position = 'bottom',
-            legend.key.width = unit(1.7, 'cm'),
-            legend.key.height = unit(0.2, 'cm'),
-            axis.text = element_text(size = 12),
-            axis.title = element_text(size = 14),
-            plot.title = element_text(hjust = 0.5, size = 14),
-            legend.title = element_text(size = 14),
-            legend.text = element_text(size = 12)) +
-      guides(fill = guide_colourbar(title.position = "top",
-                                    title.hjust = 0.5))
+    
+    if(nrow(fileIndexes) > 0){
+      
+      acousticContainer <- acousticContainer %>% 
+        filter(between(localTime, minDate, maxDate))
+      
+      comSubset <- acousticContainer %>%
+        filter(depth < -15) %>% 
+        group_by(localTime) %>%
+        summarize(COM = sum(depth * correctSv, na.rm = T) / sum(correctSv, na.rm = T),
+                  sunrise = mean(sunrise, na.rm = T),
+                  sunset = mean(sunset, na.rm = T))
+      
+      allComData <- allComData %>% 
+        bind_rows(., comSubset)
+      
+      acousticsPlot <- acousticContainer %>% 
+        ggplot(.) +
+        geom_raster(aes(x = localTime, y = depth, fill = biomassScore)) +
+        scale_fill_scico(palette = 'bilbao', limits = c(0,1)) +
+        geom_point(data = comSubset, aes(x = localTime, y = COM),
+                   colour = '#1859b5',
+                   size = 1.2, alpha = 0.15) +
+        scale_x_datetime(limits = c(minDate, minDate + days(6)),
+                         breaks = dateBreaks,
+                         date_labels = '%H:%M') +
+        scale_y_continuous(limits = c(-250, 0)) +
+        # scale_x_datetime(date_breaks = '1 day',
+        #                  date_labels = '%H:%M \n %d-%b') +
+        labs(x = 'time', y = 'depth in m', fill = 'biomassScore',
+             title = paste('acoustics from', as.Date(minDate), 'to', as.Date(minDate + days(5)))) +
+        # geom_vline(xintercept = seq(minDate + hours(12), minDate + days(6) - hours(12), by = '24 hours')) +
+        theme(panel.background = element_rect(fill = NA, colour = '#292929'),
+              legend.position = 'bottom',
+              legend.key.width = unit(1.7, 'cm'),
+              legend.key.height = unit(0.2, 'cm'),
+              axis.text = element_text(size = 12),
+              axis.title = element_text(size = 14),
+              plot.title = element_text(hjust = 0.5, size = 14),
+              legend.title = element_text(size = 14),
+              legend.text = element_text(size = 12)) +
+        guides(fill = guide_colourbar(title.position = "top",
+                                      title.hjust = 0.5))
+    } else {
+      acousticsPlot <- ggplot() +
+        geom_raster(data = tibble(x = minDate, y = 0, fill = c(0)), 
+                    aes(x = x, y = y, fill = fill), alpha = 0) +
+        scale_fill_scico(palette = 'bilbao', limits = c(0,1)) +
+        scale_x_datetime(limits = c(minDate, minDate + days(6)),
+                         breaks = dateBreaks,
+                         date_labels = '%H:%M') +
+        scale_y_continuous(limits = c(-250, 0)) +
+        labs(x = 'time', y = 'depth in m', fill = 'biomassScore',
+             title = paste('acoustics from', as.Date(minDate), 'to', as.Date(minDate + days(5)))) +
+        theme(panel.background = element_rect(fill = NA, colour = '#292929'),
+              legend.position = 'bottom',
+              legend.key.width = unit(1.7, 'cm'),
+              legend.key.height = unit(0.2, 'cm'),
+              axis.text = element_text(size = 12),
+              axis.title = element_text(size = 14),
+              plot.title = element_text(hjust = 0.5, size = 14),
+              legend.title = element_text(size = 14),
+              legend.text = element_text(size = 12)) +
+        guides(fill = guide_colourbar(title.position = "top",
+                                      title.hjust = 0.5))
+    }
     plotlist[[k]] <- acousticsPlot
   }
-  
+
   # save plots
   savePlot <- plot_grid(plotlist = plotlist, ncol = 1)
-  ggsave(paste('plots/rawAcoustics_', i, '.pdf', sep = ''), savePlot, width = 12, height = 3.5 * 5)
+  ggsave(paste('plots/rawAcoustics_', i, '.pdf', sep = ''), savePlot, width = 12, height = 3.5 * length(plotlist))
   
 }
+ 
+# Create Figure 3, Density of Centre of Mass values across seasons
+seasDiffData <-  allComData %>% 
+  mutate(dateMonth = month(localTime),
+         season = ifelse(dateMonth %in% c(12,1,2), 'summer',
+                         ifelse(dateMonth %in% c(3,4,5), 'autumn',
+                                ifelse(dateMonth %in% c(6,7), 'winter', NA)
+                         )
+         )
+  ) 
 
+seasonsVec <- c('summer','autumn','winter')
+lipari <- read_table("~/Downloads/ScientificColourMaps8/lipari/lipari.txt", 
+                     col_names = FALSE) %>% 
+  rowwise() %>% 
+  mutate(colour = rgb(X1,X2,X3, maxColorValue = 1))
+
+# create plots
+timePlotList <- list()
+for (i in 1:length(seasonsVec)){
+  
+  sunriseSunset <- seasDiffData %>% 
+    filter(season == seasonsVec[i]) %>% 
+    mutate(sunrise = as.POSIXct(paste('2020-01-01', strftime(sunrise, format="%H:%M:%S", tz = 'Etc/GMT+3'), sep = ' ')),
+           sunset = as.POSIXct(paste('2020-01-01', strftime(sunset, format="%H:%M:%S", tz = 'Etc/GMT+3'), sep = ' '))) %>% 
+    summarize(sunriseMin = min(sunrise),
+              sunriseMax = max(sunrise),
+              sunsetMin = min(sunset),
+              sunsetMax = max(sunset))
+  
+  seasDiffPlotTime <-  seasDiffData %>% 
+    filter(season == seasonsVec[i]) %>% 
+    mutate(time = as.POSIXct(paste('2020-01-01', strftime(localTime, format="%H:%M:%S", tz = 'Etc/GMT+3'), sep = ' '))) %>% 
+    ggplot(., aes(x=time, y=COM)) +
+    stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE, adjust = 0.2) +
+    scale_fill_scico(palette = 'davos') +
+    # scale_fill_gradientn(colors = lipari$colour) +
+    annotate(geom = "rect", xmin = sunriseSunset$sunriseMin, xmax = sunriseSunset$sunriseMax, ymin = -260, ymax = 5,
+             fill = "#f2f2f2", alpha = 0.2) +
+    annotate(geom = "rect", xmin = sunriseSunset$sunsetMin, xmax = sunriseSunset$sunsetMax, ymin = -260, ymax = 5,
+             fill = "#f2f2f2", alpha = 0.2) +
+    scale_x_continuous(expand = c(0, 0), breaks = c(1577837100, 1577858400,
+                                                    1577880000, 1577901600,
+                                                    1577922900),
+                       labels = c('00:00','06:00','12:00','18:00','24:00')) +
+    scale_y_continuous(expand = c(0, 0),
+                       limits = c(-260,5),
+                       breaks = c(-200, -100, 0)) +
+    labs(y = 'Depth in m',
+         x = 'time',
+         title = c('Dec-Feb 2020/21','Mar-May 2021','Jun-Jul 2021')[i]) +
+    theme(panel.background = element_rect(fill = NA, colour = '#3d3d3d'),
+          strip.background = element_rect(fill = NA),
+          strip.text = element_text(size = 28),
+          axis.text = element_text(size = 28),
+          plot.title = element_text(size = 34, hjust = 0.5),
+          axis.title = element_text(size = 28),
+          legend.key.width=unit(2.5,"cm"),
+          legend.key.height=unit(0.35,"cm"),
+          legend.text = element_text(size = 20),
+          legend.title = element_blank(),
+          legend.position = 'bottom') +
+    guides(fill = guide_colourbar(title.position = "top"))
+  
+  timePlotList[[i]] <- seasDiffPlotTime
+}
+
+# arrange plots in panel and save
+timePlot <- plot_grid(plotlist=timePlotList, nrow = 1)
+ggsave('plots/Figure3.pdf', plot = timePlot, width = 22, height = 6)
 
 
 
