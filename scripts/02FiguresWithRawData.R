@@ -329,7 +329,6 @@ acousticBlocks <- fileDateInfos %>%
   mutate(dateBlock = cut(date, '6 days')) %>% 
   ungroup() 
 
-
 dateBlocks <- acousticBlocks %>% 
   distinct(chunkBlock)
 
@@ -451,76 +450,6 @@ for(i in 1:nrow(dateBlocks)){
   
 }
  
-# Create Figure 3, Density of Centre of Mass values across seasons
-seasDiffData <-  allComData %>% 
-  mutate(dateMonth = month(localTime),
-         season = ifelse(dateMonth %in% c(12,1,2), 'summer',
-                         ifelse(dateMonth %in% c(3,4,5), 'autumn',
-                                ifelse(dateMonth %in% c(6,7), 'winter', NA)
-                         )
-         )
-  ) 
-
-seasonsVec <- c('summer','autumn','winter')
-lipari <- read_table("~/Downloads/ScientificColourMaps8/lipari/lipari.txt", 
-                     col_names = FALSE) %>% 
-  rowwise() %>% 
-  mutate(colour = rgb(X1,X2,X3, maxColorValue = 1))
-
-# create plots
-timePlotList <- list()
-for (i in 1:length(seasonsVec)){
-  
-  sunriseSunset <- seasDiffData %>% 
-    filter(season == seasonsVec[i]) %>% 
-    mutate(sunrise = as.POSIXct(paste('2020-01-01', strftime(sunrise, format="%H:%M:%S", tz = 'Etc/GMT+3'), sep = ' ')),
-           sunset = as.POSIXct(paste('2020-01-01', strftime(sunset, format="%H:%M:%S", tz = 'Etc/GMT+3'), sep = ' '))) %>% 
-    summarize(sunriseMin = min(sunrise),
-              sunriseMax = max(sunrise),
-              sunsetMin = min(sunset),
-              sunsetMax = max(sunset))
-  
-  seasDiffPlotTime <-  seasDiffData %>% 
-    filter(season == seasonsVec[i]) %>% 
-    mutate(time = as.POSIXct(paste('2020-01-01', strftime(localTime, format="%H:%M:%S", tz = 'Etc/GMT+3'), sep = ' '))) %>% 
-    ggplot(., aes(x=time, y=COM)) +
-    stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE, adjust = 0.2) +
-    scale_fill_scico(palette = 'davos') +
-    # scale_fill_gradientn(colors = lipari$colour) +
-    annotate(geom = "rect", xmin = sunriseSunset$sunriseMin, xmax = sunriseSunset$sunriseMax, ymin = -260, ymax = 5,
-             fill = "#f2f2f2", alpha = 0.2) +
-    annotate(geom = "rect", xmin = sunriseSunset$sunsetMin, xmax = sunriseSunset$sunsetMax, ymin = -260, ymax = 5,
-             fill = "#f2f2f2", alpha = 0.2) +
-    scale_x_continuous(expand = c(0, 0), breaks = c(1577837100, 1577858400,
-                                                    1577880000, 1577901600,
-                                                    1577922900),
-                       labels = c('00:00','06:00','12:00','18:00','24:00')) +
-    scale_y_continuous(expand = c(0, 0),
-                       limits = c(-260,5),
-                       breaks = c(-200, -100, 0)) +
-    labs(y = 'Depth in m',
-         x = 'time',
-         title = c('Dec-Feb 2020/21','Mar-May 2021','Jun-Jul 2021')[i]) +
-    theme(panel.background = element_rect(fill = NA, colour = '#3d3d3d'),
-          strip.background = element_rect(fill = NA),
-          strip.text = element_text(size = 28),
-          axis.text = element_text(size = 28),
-          plot.title = element_text(size = 34, hjust = 0.5),
-          axis.title = element_text(size = 28),
-          legend.key.width=unit(2.5,"cm"),
-          legend.key.height=unit(0.35,"cm"),
-          legend.text = element_text(size = 20),
-          legend.title = element_blank(),
-          legend.position = 'bottom') +
-    guides(fill = guide_colourbar(title.position = "top"))
-  
-  timePlotList[[i]] <- seasDiffPlotTime
-}
-
-# arrange plots in panel and save
-timePlot <- plot_grid(plotlist=timePlotList, nrow = 1)
-ggsave('plots/Figure3.pdf', plot = timePlot, width = 22, height = 6)
-
 
 
 

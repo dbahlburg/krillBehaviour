@@ -87,14 +87,8 @@ prettyMap <- wholeAreaBathy * slScaled^(1/2) * hillMultiScaled^3
 nx <- minmax(prettyMap)
 prettyMapScaled <- (prettyMap - nx[1,]) / (nx[2,] - nx[1,])
 # ------------------------------------------------------------------------------------------------------------------ #
-# wholeAreaBathy <- as.data.frame(wholeAreaBathy, xy=T) %>% 
-#   mutate(elevation = ifelse(x>0,0,z))
-SOBathy <- crop(prettyMapScaled, ext(-47.1, -43.3, -60.75, -59.1))
-# SOBathy <- as.data.frame(SOBathy,xy=T)%>% 
-#   mutate(elevation = ifelse(z>0,0,z))
-SOPeninsula <- crop(prettyMapScaled, ext(-62, -55.9, -64.4, -62.4))
-# SOPeninsula <- as.data.frame(SOPeninsula,xy=T)%>% 
-#   mutate(elevation = ifelse(z>0,0,z))
+SOBathy <- crop(wholeAreaBathy, ext(-47.1, -43.3, -60.75, -59.1))
+SOPeninsula <- crop(wholeAreaBathy, ext(-62, -55.9, -64.4, -62.4))
 
 # pre-define theme settings for plots to save space
 lightMode <- theme(panel.background = element_rect(fill = '#ffffff', colour = '#212121'),
@@ -127,11 +121,6 @@ cruiseTrackPlot <- cruiseData %>%
                    limits = c(-6000, 0),
                    breaks = seq(-6000, 0, by = 500)) +
   new_scale_fill() +
-  # geom_spatraster(data = prettyMapScaled,
-  #                 maxcell = 1.5e+06) +
-  # scale_fill_gradient(low = '#616161', high = '#fafafa',
-  #                  limits = c(0,1),
-  #                  guide = 'none') +
   geom_spatvector(data = wholeArea, linewidth = 0.1, 
                   colour = NA, fill = '#6e6e6e') +
   geom_path(aes(x = long, y = lat, colour = monthLabel, group = behavBlock),
@@ -170,7 +159,7 @@ peninsulaBehavPlot <- cruiseData %>%
                         levels = c('diffuse surface', 'small scale\n reverse DVM', 'DVM-100m', 'DVM-150m', 'DVM 12h', 
                                    'diffuse DVM', 'deep DVM', 'no data'))) %>% 
   ggplot(.) +
-  geom_raster(data = SOPeninsula, aes(x = x, y = y, fill = elevation)) +
+  geom_spatraster(data = SOPeninsula) +
   scale_fill_gradient(low = '#616161', high = '#fafafa',
                       limits = c(-6000, 0),
                       breaks = seq(-6000, 0, by = 2000), guide = 'none') +
@@ -196,7 +185,7 @@ SObehavPlot <- cruiseData %>%
                         levels = c('diffuse surface', 'small scale\n reverse DVM', 'DVM-100m', 'DVM-150m', 'DVM 12h', 
                                    'diffuse DVM', 'deep DVM', 'no data'))) %>% 
   ggplot(.) +
-  geom_raster(data = SOBathy, aes(x = x, y = y, fill = elevation)) +
+  geom_spatraster(data = SOBathy) +
   scale_fill_gradient(low = '#616161', high = '#fafafa',
                       limits = c(-6000, 0),
                       breaks = seq(-6000, 0, by = 2000), guide = 'none') +
