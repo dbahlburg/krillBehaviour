@@ -37,8 +37,14 @@ behaviourTitles <- tibble(behavior = c('constantSurface','shallowDVM','reverseDV
 krillBehaviour <- krillBehaviour %>% 
   left_join(.,behaviourTitles)
 
-# import cruise data from timeSeriesMetrics.RDS - this is a slimmed down dataset that excludes any depth-specific information (backscattering values etc.)
-cruiseData <- readRDS('data/krillAcousticsProcessed/timeSeriesMetrics.RDS') %>%
+# import cruise data 
+cruiseData <- read.csv('~/github/krillBehaviour/data/behaviourData.csv') %>% 
+  mutate(localTime = as.POSIXct(localTime, format = "%Y-%m-%d %H:%M:%S"),
+         localTime = force_tz(localTime, "Etc/GMT+3"),
+         localTime = round_date(localTime, unit = 'minute'),
+         date = as.Date(as.POSIXct(localTime), tz = 'Etc/GMT+3'),
+         sunrise = force_tz(as.POSIXct(sunrise), "Etc/GMT+3"),
+         sunset = force_tz(as.POSIXct(sunset), "Etc/GMT+3")) %>% 
   filter(lat < -57.5) %>% 
   distinct(localTime, lat, long) %>% 
   mutate(date = as.Date(localTime, tz = 'Etc/GMT+3')) %>% 
@@ -58,34 +64,6 @@ southOrkneys <- crop(coastline, ext(-47.5, -43, -60.75, -59))
 bathy <- rast('~/github/SOdata/IBCSO_v2_ice-surface_WGS84.nc')
 wholeAreaBathy <- crop(bathy, ext(-62, -43,-65, -59))
 wholeAreaBathy[wholeAreaBathy>0] <- 0
-# ------------------------------------------------------------------------------------------------------------------ #
-# estimate the slope
-sl <- terrain(wholeAreaBathy, "slope", unit = "radians")
-# estimate the aspect or orientation
-asp <- terrain(wholeAreaBathy, "aspect", unit = "radians")
-# calculate the hillshade effect with 45º of elevation
-hillMulti <- purrr::map(c(270, 15, 60, 140, 330), function(dir){
-  shade(sl, asp,
-        angle = 45,
-        direction = dir,
-        normalize= TRUE)}
-)
-# create a multidimensional raster and reduce it by summing up
-hillMulti <- rast(hillMulti) %>% sum()
-#hillMultiAdj <- exp(0.5 * hillMulti/100)
-# ------------------------------------------------------------------------------------------------------------------ #
-# create prettier colours
-nx <- minmax(hillMulti)
-hillMultiScaled <- (hillMulti - nx[1,]) / (nx[2,] - nx[1,])
-hillMultiScaled <- resample(hillMultiScaled, wholeAreaBathy, method = 'bilinear')
-
-nx <- minmax(sl)
-slScaled <- abs((sl - nx[1,]) / (nx[2,] - nx[1,]) - 1)
-slScaled <- resample(slScaled, wholeAreaBathy, method = 'bilinear')
-
-prettyMap <- wholeAreaBathy * slScaled^(1/2) * hillMultiScaled^3
-nx <- minmax(prettyMap)
-prettyMapScaled <- (prettyMap - nx[1,]) / (nx[2,] - nx[1,])
 # ------------------------------------------------------------------------------------------------------------------ #
 SOBathy <- crop(wholeAreaBathy, ext(-47.1, -43.3, -60.75, -59.1))
 SOPeninsula <- crop(wholeAreaBathy, ext(-62, -55.9, -64.4, -62.4))
@@ -140,8 +118,8 @@ cruiseTrackSouthOrkneys <- cruiseTrackPlot +
   scale_y_continuous(limits = c(-60.75, -59.1))
 
 # save plots
-ggsave('plots/cruiseTrackPeninsula.png', plot = cruiseTrackPeninsula + theme(legend.position = 'none'), width = 14, height = 9)
-ggsave('plots/cruiseTrackSouthOrkneys.png', plot = cruiseTrackSouthOrkneys + theme(legend.position = 'none'), width = 14, height = 9)
+ggsave('plots/cruiseTrackPeninsula2.png', plot = cruiseTrackPeninsula + theme(legend.position = 'none'), width = 14, height = 9)
+ggsave('plots/cruiseTrackSouthOrkneys2.png', plot = cruiseTrackSouthOrkneys + theme(legend.position = 'none'), width = 14, height = 9)
 ggsave('plots/Figure1legends.pdf', plot = cruiseTrackSouthOrkneys, width = 14, height = 9)
 # ------------------------------------------------------------------------------------------------------------------------------ #
 # Figure 3 behaviour maps and timelines
@@ -458,22 +436,4 @@ environmentBehaviourPlot <- environmentBehaviour %>%
         plot.margin = margin(75, 25, 5, 10),
         legend.position = 'none')
 ggsave('plots/Figure4.pdf', width = 14, height = 9)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

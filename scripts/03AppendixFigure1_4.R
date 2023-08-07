@@ -202,7 +202,13 @@ seaIceDf <- seaIceDf %>%
 seaIceDfWeekly <- seaIceDf %>% 
   filter(dateUTC %in% seq(as.POSIXct('2021-06-27 12:00:00'), as.POSIXct('2021-07-25 12:00:00'), '7 days'))
 
-positionWinter <- readRDS('~/github/krillBehaviour/data/krillAcousticsProcessed/timeSeriesMetrics.RDS') %>%
+positionWinter <- read.csv('~/github/krillBehaviour/data/behaviourData.csv') %>% 
+  mutate(localTime = as.POSIXct(localTime, format = "%Y-%m-%d %H:%M:%S"),
+         localTime = force_tz(localTime, "Etc/GMT+3"),
+         localTime = round_date(localTime, unit = 'minute'),
+         date = as.Date(as.POSIXct(localTime), tz = 'Etc/GMT+3'),
+         sunrise = force_tz(as.POSIXct(sunrise), "Etc/GMT+3"),
+         sunset = force_tz(as.POSIXct(sunset), "Etc/GMT+3")) %>% 
   filter(lat < -57.5) %>% 
   distinct(localTime, lat, long) %>% 
   mutate(date = as.Date(localTime, tz = 'Etc/GMT+3')) %>% 
@@ -278,7 +284,7 @@ legendPlot <- get_legend(plotlist[[i]] + theme(legend.key.width=unit(3,"cm"),
 }
 prow <- plot_grid(plotlist = plotlist, ncol = 3)
 seaIcePlots <- plot_grid(prow, NULL, legendPlot, ncol = 1, rel_heights = c(1,0.1,0.1))
-ggsave('plots/seaIce.pdf', plot = seaIcePlots, width = 22, height = 7)
+ggsave('plots/seaIce2.pdf', plot = seaIcePlots, width = 22, height = 7)
 
 
 

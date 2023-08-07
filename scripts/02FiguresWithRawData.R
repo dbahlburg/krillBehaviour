@@ -313,6 +313,14 @@ winterWhalesPlot <- winterWhales %>%
 ggsave('plots/winterWhales.png', plot = winterWhalesPlot, width = 17, height = 7)
 # ----------------------------------------------------------------------------------------------------- #
 # Appendix Figure 5-13, month by month
+comData <- read.csv('~/github/krillBehaviour/data/behaviourData.csv') %>% 
+  mutate(localTime = as.POSIXct(localTime, format = "%Y-%m-%d %H:%M:%S"),
+         localTime = force_tz(localTime, "Etc/GMT+3"),
+         localTime = round_date(localTime, unit = 'minute'),
+         date = as.Date(as.POSIXct(localTime), tz = 'Etc/GMT+3'),
+         sunrise = force_tz(as.POSIXct(sunrise), "Etc/GMT+3"),
+         sunset = force_tz(as.POSIXct(sunset), "Etc/GMT+3")) 
+
 acousticBlocks <- fileDateInfos %>% 
   right_join(., tibble(date = seq(as.Date('2020-12-01'), as.Date('2021-07-31'), by = '1 day'))) %>% 
   arrange(date) %>% 
@@ -374,15 +382,18 @@ for(i in 1:nrow(dateBlocks)){
         filter(between(localTime, minDate, maxDate))
       
       comSubset <- acousticContainer %>%
-        filter(depth < -15) %>% 
+        filter(depth < -15) %>%
         group_by(localTime) %>%
         summarize(COM = sum(depth * correctSv, na.rm = T) / sum(correctSv, na.rm = T),
                   sunrise = mean(sunrise, na.rm = T),
                   sunset = mean(sunset, na.rm = T))
-      
-      allComData <- allComData %>% 
+
+      allComData <- allComData %>%
         bind_rows(., comSubset)
       
+      # comSubset <- comData %>% 
+      #   filter(between(localTime, minDate, maxDate))
+        
       acousticsPlot <- acousticContainer %>% 
         ggplot(.) +
         geom_raster(aes(x = localTime, y = depth, fill = biomassScore)) +
@@ -442,10 +453,4 @@ for(i in 1:nrow(dateBlocks)){
   
 }
  
-
-
-
-
-
-
 
