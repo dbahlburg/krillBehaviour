@@ -187,7 +187,7 @@ southOrkneysBathy <- as.data.frame(southOrkneysBathy, xy=T) %>%
   mutate(elevation = ifelse(z>0,0,z))
 
 # sea ice edge contour line for >0.15 sea ice concentration
-seaIce <- rast('data/C3S-GLO-SST-L4-REP-OBS-SST_1678116625437.nc')
+seaIce <- rast('data/seaIceData.nc')
 seaIce <- crop(seaIce, ext(-49, -41,-62, -58))
 seaIceTime <- time(seaIce)
 seaIceInd <- which(between(seaIceTime, as.POSIXct('2021-06-25 00:00:00'), as.POSIXct('2021-07-29 00:00:00')))
@@ -200,7 +200,7 @@ seaIceDf <- seaIceDf %>%
          dateUTC = force_tz(date, 'UTC'))
 
 seaIceDfWeekly <- seaIceDf %>% 
-  filter(dateUTC %in% seq(min(seaIceTime), max(seaIceTime), '7 days'))
+  filter(dateUTC %in% seq(as.POSIXct('2021-06-27 12:00:00'), as.POSIXct('2021-07-25 12:00:00'), '7 days'))
 
 positionWinter <- readRDS('~/github/krillBehaviour/data/krillAcousticsProcessed/timeSeriesMetrics.RDS') %>%
   filter(lat < -57.5) %>% 
